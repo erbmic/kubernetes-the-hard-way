@@ -7,7 +7,7 @@ RAM_SIZE = 16
 
 # Define how mnay CPU cores you have.
 # More powerful workers will be created if you have more
-CPU_CORES = 8
+CPU_CORES = 12
 
 # Internal network prefix for the VM network
 # See the documentation before changing this
