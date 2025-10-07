@@ -1,31 +1,48 @@
-#!/bin/bash
-#
-# Set up /etc/hosts so we can resolve all the machines in the VirtualBox network
-set -e
-IFNAME=$1
-THISHOST=$2
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Host will have 3 interfaces: lo, DHCP assigned NAT network and static on VM network
-# We want the VM network
-PRIMARY_IP="$(ip -4 addr show | grep "inet" | egrep -v '(dynamic|127\.0\.0)' | awk '{print $2}' | cut -d/ -f1)"
-NETWORK=$(echo $PRIMARY_IP | awk 'BEGIN {FS="."} ; { printf("%s.%s.%s", $1, $2, $3) }')
-#sed -e "s/^.*${HOSTNAME}.*/${PRIMARY_IP} ${HOSTNAME} ${HOSTNAME}.local/" -i /etc/hosts
+IFNAME="${1:-}"         # z.B. enp1s0 (libvirt) / enp0s8 (VBox)
+THISHOST="${2:-}"
 
-# Export PRIMARY IP as an environment variable
-echo "PRIMARY_IP=${PRIMARY_IP}" >> /etc/environment
+# 1) Primäre IP ermitteln
+PRIMARY_IP=""
 
-# Export architecture as environment variable to download correct versions of software
-echo "ARCH=amd64"  | sudo tee -a /etc/environment > /dev/null
+if [[ -n "${IFNAME}" ]]; then
+  PRIMARY_IP="$(ip -4 -o addr show dev "$IFNAME" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1 || true)"
+fi
 
-# remove ubuntu-jammy entry
-sed -e '/^.*ubuntu-jammy.*/d' -i /etc/hosts
-sed -e "/^.*$2.*/d" -i /etc/hosts
+# Fallback: IP aus libvirt-Standardnetz 192.168.121.0/24 autodetektierten
+if [[ -z "${PRIMARY_IP}" ]]; then
+  PRIMARY_IP="$(ip -4 -o addr show | awk '/inet /{print $4}' | cut -d/ -f1 | grep -E '^192\.168\.121\.' | head -n1 || true)"
+fi
 
-# Update /etc/hosts about other hosts
-cat >> /etc/hosts <<EOF
+# Letzter Fallback: irgendeine nicht-loopback IPv4 (nicht ideal)
+if [[ -z "${PRIMARY_IP}" ]]; then
+  PRIMARY_IP="$(ip -4 -o addr show | awk '/inet / && $2!="lo"{print $4}' | cut -d/ -f1 | head -n1 || true)"
+fi
+
+if [[ -z "${PRIMARY_IP}" ]]; then
+  echo "ERROR: could not determine PRIMARY_IP" >&2
+  exit 1
+fi
+
+NETWORK="$(awk -F. '{printf "%s.%s.%s", $1,$2,$3}' <<< "$PRIMARY_IP")"
+
+# 2) Umgebung setzen
+grep -q '^PRIMARY_IP=' /etc/environment || echo "PRIMARY_IP=${PRIMARY_IP}" | sudo tee -a /etc/environment >/dev/null
+grep -q '^ARCH='       /etc/environment || echo "ARCH=amd64"              | sudo tee -a /etc/environment >/dev/null
+
+# 3) Hosts-Datei nur gezielt anpassen
+sudo sed -i "/\s${THISHOST}\(\s\|$\)/d" /etc/hosts || true
+
+# Eigene Zeilen erneuern
+sudo sed -i '/# BEGIN VAGRANT K8S HOSTS/,/# END VAGRANT K8S HOSTS/d' /etc/hosts
+sudo tee -a /etc/hosts >/dev/null <<EOF
+# BEGIN VAGRANT K8S HOSTS
 ${NETWORK}.11  controlplane01
 ${NETWORK}.12  controlplane02
 ${NETWORK}.21  node01
 ${NETWORK}.22  node02
 ${NETWORK}.30  loadbalancer
+# END VAGRANT K8S HOSTS
 EOF
