@@ -99,7 +99,7 @@ Vagrant.configure("2") do |config|
     config.vm.define "controlplane0#{i}" do |node|
       # Name shown in the GUI
       node.vm.provider :libvirt do |lv|
-        lv.name = "kubernetes-ha-controlplane-#{i}"
+        lv.title = "kubernetes-ha-controlplane-#{i}"
         lv.memory = RESOURCES["control"][i > 2 ? 2 : i]["ram"]
         lv.cpus = RESOURCES["control"][i > 2 ? 2 : i]["cpu"]
       end
@@ -119,7 +119,7 @@ Vagrant.configure("2") do |config|
   # Provision Load Balancer Node
   config.vm.define "loadbalancer" do |node|
     node.vm.provider :libvirt do |lv|
-      lv.name = "kubernetes-ha-lb"
+      lv.title = "kubernetes-ha-lb"
       lv.memory = 512
       lv.cpus = 1
     end
@@ -135,7 +135,7 @@ Vagrant.configure("2") do |config|
   (1..NUM_WORKER_NODE).each do |i|
     config.vm.define "node0#{i}" do |node|
       node.vm.provider :libvirt do |lv|
-        lv.name = "kubernetes-ha-node-#{i}"
+        lv.title = "kubernetes-ha-node-#{i}"
         lv.memory = RESOURCES["worker"]["ram"]
         lv.cpus = RESOURCES["worker"]["cpu"]
       end
