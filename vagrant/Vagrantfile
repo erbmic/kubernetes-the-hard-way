@@ -94,7 +94,7 @@ Vagrant.configure("2") do |config|
     config.vm.define "controlplane0#{i}" do |node|
       # Name shown in the GUI
       node.vm.provider "virtualbox" do |vb|
-        vb.title = "kubernetes-ha-controlplane-#{i}"
+        vb.name = "kubernetes-ha-controlplane-#{i}"
         vb.memory = RESOURCES["control"][i > 2 ? 2 : i]["ram"]
         vb.cpus = RESOURCES["control"][i > 2 ? 2 : i]["cpu"]
       end
@@ -114,7 +114,7 @@ Vagrant.configure("2") do |config|
   # Provision Load Balancer Node
   config.vm.define "loadbalancer" do |node|
     node.vm.provider "virtualbox" do |vb|
-      vb.title = "kubernetes-ha-lb"
+      vb.name = "kubernetes-ha-lb"
       vb.memory = 512
       vb.cpus = 1
     end
@@ -130,7 +130,7 @@ Vagrant.configure("2") do |config|
   (1..NUM_WORKER_NODE).each do |i|
     config.vm.define "node0#{i}" do |node|
       node.vm.provider "virtualbox" do |vb|
-        vb.title = "kubernetes-ha-node-#{i}"
+        vb.name = "kubernetes-ha-node-#{i}"
         vb.memory = RESOURCES["worker"]["ram"]
         vb.cpus = RESOURCES["worker"]["cpu"]
       end
