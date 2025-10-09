@@ -13,13 +13,6 @@ CPU_CORES = 12
 # See the documentation before changing this
 IP_NW = "192.168.121."
 
-config.vm.provider :libvirt do |lv|
-  lv.management_network_name = "vagrant-libvirt"
-  lv.graphics_type = "none"
-  lv.cpu_mode = "host-passthrough"
-  # optional: lv.uri = "qemu:///system"  # erzwingt System-Connection
-end
-
 # Calculate resource amounts
 # based on RAM/CPU
 ram_selector = (RAM_SIZE / 4) * 4
