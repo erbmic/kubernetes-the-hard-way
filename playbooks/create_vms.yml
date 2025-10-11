@@ -4,7 +4,7 @@
   vars_files: ['../vars/vms.yml']
   collections: [community.libvirt]
   vars:
-    ssh_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}
+    ssh_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
     libvirt_pool: default
     libvirt_uri: "qemu:///system"
     pool_dir: "/var/lib/libvirt/images"
@@ -45,7 +45,7 @@
         name: "{{ libvirt_pool }}"
         command: autostart
         uri: "{{ libvirt_uri }}"   
-              
+
     - name: Ensure cloud image present
       get_url:
         url: "{{ image_url }}"
