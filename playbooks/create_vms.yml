@@ -4,9 +4,48 @@
   vars_files: ['../vars/vms.yml']
   collections: [community.libvirt]
   vars:
-    ssh_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+    ssh_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}
+    libvirt_pool: default
+    libvirt_uri: "qemu:///system"
+    pool_dir: "/var/lib/libvirt/images"
 
-  tasks:      
+  tasks: 
+    - name: Ensure pool directory exists
+      become: true
+      file:
+        path: "{{ pool_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: List existing pools (system URI)
+      community.libvirt.virt_pool:
+        command: list_pools
+        uri: "{{ libvirt_uri }}"
+      register: pools
+
+    - name: Define dir pool if missing (idempotent)
+      community.libvirt.virt_pool:
+        command: define
+        uri: "{{ libvirt_uri }}"
+        xml: |
+          <pool type='dir'>
+            <name>{{ libvirt_pool }}</name>
+            <target><path>{{ pool_dir }}</path></target>
+          </pool>
+      when: libvirt_pool not in (pools.pools | default([]))
+
+    - name: Start pool
+      community.libvirt.virt_pool:
+        name: "{{ libvirt_pool }}"
+        command: start
+        uri: "{{ libvirt_uri }}"
+
+    - name: Autostart pool
+      community.libvirt.virt_pool:
+        name: "{{ libvirt_pool }}"
+        command: autostart
+        uri: "{{ libvirt_uri }}"   
+              
     - name: Ensure cloud image present
       get_url:
         url: "{{ image_url }}"
