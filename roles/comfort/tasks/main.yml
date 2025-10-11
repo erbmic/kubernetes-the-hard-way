@@ -1,0 +1,15 @@
+- name: Deploy tmux.conf
+  copy:
+    src: files/tmux.conf
+    dest: /home/ubuntu/.tmux.conf
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Deploy vimrc
+  copy:
+    src: files/vimrc
+    dest: /home/ubuntu/.vimrc
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"

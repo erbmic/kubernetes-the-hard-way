@@ -1,0 +1,29 @@
+- name: Configure kernel sysctls
+  copy:
+    dest: /etc/sysctl.d/10-kubernetes.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables = 1
+      net.ipv4.ip_forward = 1
+      net.ipv6.conf.all.disable_ipv6 = 1
+      net.ipv6.conf.default.disable_ipv6 = 1
+
+- name: Apply sysctls
+  command: sysctl --system
+
+- name: Ensure cluster hosts in /etc/hosts
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      192.168.121.11 controlplane01
+      192.168.121.12 controlplane02
+      192.168.121.21 node01
+      192.168.121.22 node02
+      192.168.121.30 loadbalancer
+
+- name: Configure DNS resolver
+  copy:
+    dest: /etc/resolv.conf
+    content: |
+      nameserver 1.1.1.1
+      nameserver 8.8.8.8
+      options timeout:2 attempts:3

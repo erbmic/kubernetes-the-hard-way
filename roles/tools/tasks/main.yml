@@ -1,0 +1,5 @@
+- name: Install cert_verify.sh helper
+  copy:
+    src: files/cert_verify.sh
+    dest: /usr/local/bin/cert_verify.sh
+    mode: "0755"

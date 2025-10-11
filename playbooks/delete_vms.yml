@@ -1,0 +1,23 @@
+- name: Destroy K8s Hard-Way VMs
+  hosts: localhost
+  gather_facts: false
+  collections: [community.libvirt]
+  vars_files: ['../vars/vms.yml']
+  tasks:
+    - name: Stop and undefine domains
+      virt:
+        name: "{{ item.name }}"
+        state: undefined
+        remove_images: true
+      loop: "{{ vms }}"
+    - name: Remove disks
+      virt_volume:
+        pool: "{{ libvirt_pool }}"
+        name: "{{ item.name }}.qcow2"
+        state: absent
+      loop: "{{ vms }}"
+    - name: Remove seed ISOs
+      file:
+        path: "../cloudinit/{{ item.name }}-seed.iso"
+        state: absent
+      loop: "{{ vms }}"

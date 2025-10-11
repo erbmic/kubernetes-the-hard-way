@@ -1,0 +1,41 @@
+libvirt_pool: default          # dein Storage-Pool
+libvirt_network: vagrant-libvirt
+bridge_name: virbr1            # aus virsh net-info
+image_url: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+
+vms:
+  - name: controlplane01
+    ip: 192.168.121.11/24
+    gw: 192.168.121.1
+    dns: 1.1.1.1
+    mem_mb: 2048
+    vcpus: 4
+    disk_gb: 20
+  - name: controlplane02
+    ip: 192.168.121.12/24
+    gw: 192.168.121.1
+    dns: 1.1.1.1
+    mem_mb: 2048
+    vcpus: 2
+    disk_gb: 20
+  - name: node01
+    ip: 192.168.121.21/24
+    gw: 192.168.121.1
+    dns: 1.1.1.1
+    mem_mb: 2048
+    vcpus: 2
+    disk_gb: 30
+  - name: node02
+    ip: 192.168.121.22/24
+    gw: 192.168.121.1
+    dns: 1.1.1.1
+    mem_mb: 2048
+    vcpus: 2
+    disk_gb: 30
+  - name: loadbalancer
+    ip: 192.168.121.30/24
+    gw: 192.168.121.1
+    dns: 1.1.1.1
+    mem_mb: 512
+    vcpus: 1
+    disk_gb: 10
