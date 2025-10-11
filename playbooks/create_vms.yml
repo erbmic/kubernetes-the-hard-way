@@ -25,8 +25,9 @@
 
     - name: Define dir pool if missing (idempotent)
       community.libvirt.virt_pool:
-        command: define
         uri: "{{ libvirt_uri }}"
+        command: define
+        name: "{{ libvirt_pool }}"
         xml: |
           <pool type='dir'>
             <name>{{ libvirt_pool }}</name>
