@@ -7,6 +7,34 @@
     ssh_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
 
   tasks:
+    - name: Ensure pool directory exists
+      file:
+        path: /var/lib/libvirt/images
+        state: directory
+        mode: "0755"
+
+    - name: Ensure libvirt storage pool is defined and started
+      community.libvirt.virt_pool:
+        name: "{{ libvirt_pool }}"
+        command: define
+        xml: |
+          <pool type='dir'>
+            <name>{{ libvirt_pool }}</name>
+            <target>
+              <path>/var/lib/libvirt/images</path>
+            </target>
+          </pool>
+
+    - name: Start and autostart pool
+      community.libvirt.virt_pool:
+        name: "{{ libvirt_pool }}"
+        command: start
+
+    - name: Autostart pool
+      community.libvirt.virt_pool:
+        name: "{{ libvirt_pool }}"
+        command: autostart
+
     - name: Ensure cloud image present
       get_url:
         url: "{{ image_url }}"
