@@ -116,27 +116,65 @@
           NETWORK_CONFIG: "{{ lookup('file', playbook_dir + '/../cloudinit/' + item.name + '-network-config') }}"
       loop: "{{ vms }}"
 
-    - name: Define and start VMs
+    - name: Define domains via XML
       community.libvirt.virt:
+        uri: "{{ libvirt_uri }}"              # z.B. qemu:///system
+        command: define
+        xml: |
+          <domain type='kvm'>
+            <name>{{ item.name }}</name>
+            <memory unit='MiB'>{{ item.mem_mb }}</memory>
+            <vcpu>{{ item.vcpus }}</vcpu>
+            <os>
+              <type arch='x86_64' machine='pc'>hvm</type>
+              <boot dev='hd'/>
+              <boot dev='cdrom'/>
+            </os>
+            <features>
+              <acpi/>
+              <apic/>
+              <pae/>
+            </features>
+            <cpu mode='host-passthrough'/>
+            <devices>
+              <!-- Systemdisk (qcow2 im Pool-Pfad) -->
+              <disk type='file' device='disk'>
+                <driver name='qemu' type='qcow2'/>
+                <source file='{{ pool_path }}/{{ item.name }}.qcow2'/>
+                <target dev='vda' bus='virtio'/>
+              </disk>
+              <!-- Cloud-Init Seed ISO -->
+              <disk type='file' device='cdrom'>
+                <driver name='qemu' type='raw'/>
+                <source file='{{ pool_path }}/{{ item.name }}-seed.iso'/>
+                <target dev='sda' bus='sata'/>
+                <readonly/>
+              </disk>
+              <!-- Netzwerk an dein libvirt-Network -->
+              <interface type='network'>
+                <source network='{{ libvirt_network }}'/>
+                <model type='virtio'/>
+              </interface>
+              <!-- headless -->
+              <graphics type='vnc' listen='127.0.0.1' autoport='yes'/>
+              <console type='pty'/>
+              <input type='mouse' bus='ps2'/>
+              <video>
+                <model type='cirrus' vram='16384'/>
+              </video>
+            </devices>
+            <on_poweroff>destroy</on_poweroff>
+            <on_reboot>restart</on_reboot>
+            <on_crash>restart</on_crash>
+          </domain>
+      loop: "{{ vms }}"
+
+    - name: Ensure domains are running
+      community.libvirt.virt:
+        uri: "{{ libvirt_uri }}"
         name: "{{ item.name }}"
         state: running
         autostart: true
-        memory_mb: "{{ item.mem_mb }}"
-        vcpus: "{{ item.vcpus }}"
-        networks:
-          - network: "{{ libvirt_network }}"
-        disks:
-          - type: file
-            device: disk
-            path: "{{ pool_path }}/{{ item.name }}.qcow2"
-            format: qcow2
-          - type: file
-            device: cdrom
-            path: "{{ pool_path }}/{{ item.name }}-seed.iso"
-        boot: hd,cdrom
-        graphics: none
-        os_type: linux
-        arch: x86_64
       loop: "{{ vms }}"
 
     - name: Wait for SSH on each VM
