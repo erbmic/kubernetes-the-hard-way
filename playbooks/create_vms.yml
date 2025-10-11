@@ -1,38 +1,54 @@
 - name: Create K8s Hard-Way VMs on libvirt (Ansible-only)
   hosts: localhost
   gather_facts: false
-  vars_files:
-    - ../vars/vms.yml
-  collections:
-    - community.libvirt
+  vars_files: ['../vars/vms.yml']
+  collections: [community.libvirt]
   vars:
     ssh_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
   tasks:
     - name: Ensure cloud image present
       get_url:
         url: "{{ image_url }}"
         dest: "../images/jammy.qcow2"
         mode: "0644"
-      register: img
-    - name: Create base volume per VM (backed by cloud image)
-      virt_pool:
-        command: refresh
+
+    - name: Refresh storage pool
+      community.libvirt.virt_pool:
         name: "{{ libvirt_pool }}"
-    - name: Create VM disks (qcow2)
-      virt_volume:
+        command: refresh
+
+    - name: Get pool XML
+      command: "virsh pool-dumpxml {{ libvirt_pool }}"
+      register: pool_xml
+      changed_when: false
+
+    - name: Extract pool path
+      set_fact:
+        pool_path: "{{ pool_xml.stdout | regex_search('<path>(.*?)</path>', '\\1') }}"
+
+    - name: Create qcow2 volumes with backing (libvirt XML)
+      community.libvirt.virt_volume:
         pool: "{{ libvirt_pool }}"
-        name: "{{ item.name }}.qcow2"
-        capacity: "{{ item.disk_gb }}G"
-        backing_store: "../images/jammy.qcow2"
-        format: qcow2
         state: present
+        xml: |
+          <volume type='file'>
+            <name>{{ item.name }}.qcow2</name>
+            <capacity unit='G'>{{ item.disk_gb }}</capacity>
+            <target>
+              <format type='qcow2'/>
+            </target>
+            <backingStore type='file'>
+              <path>{{ (playbook_dir + '/../images/jammy.qcow2') | realpath }}</path>
+              <format type='qcow2'/>
+            </backingStore>
+          </volume>
       loop: "{{ vms }}"
 
     - name: Render cloud-init user-data
       template:
         src: "../cloudinit/user-data.tpl"
         dest: "../cloudinit/{{ item.name }}-user-data"
-        mode: "0644"
       loop: "{{ vms }}"
       vars:
         name: "{{ item.name }}"
@@ -42,46 +58,46 @@
       template:
         src: "../cloudinit/network-config.tpl"
         dest: "../cloudinit/{{ item.name }}-network-config"
-        mode: "0644"
       loop: "{{ vms }}"
       vars:
         ip: "{{ item.ip }}"
         gw: "{{ item.gw }}"
         dns: "{{ item.dns }}"
 
-    - name: Make NoCloud seed ISO
-      command: >
-        cloud-localds
-        ../cloudinit/{{ item.name }}-seed.iso
-        ../cloudinit/{{ item.name }}-user-data
-        ../cloudinit/{{ item.name }}-network-config
-      args:
-        creates: "../cloudinit/{{ item.name }}-seed.iso"
+    - name: Create CIDATA CDROM via libvirt
+      community.libvirt.virt_volume:
+        pool: "{{ libvirt_pool }}"
+        command: create_cidata_cdrom
+        name: "{{ item.name }}-seed.iso"
+        cloudinit_config:
+          USERDATA: "{{ lookup('file', playbook_dir + '/../cloudinit/' + item.name + '-user-data') }}"
+          NETWORK_CONFIG: "{{ lookup('file', playbook_dir + '/../cloudinit/' + item.name + '-network-config') }}"
       loop: "{{ vms }}"
 
     - name: Define and start VMs
-      virt:
+      community.libvirt.virt:
         name: "{{ item.name }}"
         state: running
+        autostart: true
         memory_mb: "{{ item.mem_mb }}"
         vcpus: "{{ item.vcpus }}"
-        autostart: true
         networks:
           - network: "{{ libvirt_network }}"
-            # static IP per cloud-init; libvirt DHCP nicht erforderlich
         disks:
-          - name: "{{ item.name }}.qcow2"
-            pool: "{{ libvirt_pool }}"
-          - name: "{{ item.name }}-seed.iso"
-            pool: "default"
+          - type: file
+            device: disk
+            path: "{{ pool_path }}/{{ item.name }}.qcow2"
+            format: qcow2
+          - type: file
             device: cdrom
+            path: "{{ pool_path }}/{{ item.name }}-seed.iso"
         boot: hd,cdrom
         graphics: none
         os_type: linux
         arch: x86_64
       loop: "{{ vms }}"
 
-    - name: Wait for SSH to be available (22/tcp)
+    - name: Wait for SSH on each VM
       wait_for:
         host: "{{ item.ip.split('/')[0] }}"
         port: 22
