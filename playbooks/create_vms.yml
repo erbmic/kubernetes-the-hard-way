@@ -61,7 +61,7 @@
         command: refresh
 
     - name: Get pool XML
-      command: "virsh pool-dumpxml {{ libvirt_pool }}"
+      command: "virsh -c {{ libvirt_uri }} pool-dumpxml {{ libvirt_pool }}"
       register: pool_xml
       changed_when: false
 
