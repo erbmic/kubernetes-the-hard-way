@@ -41,14 +41,13 @@
         name: "{{ libvirt_pool }}"
         state: active
 
-    - name: Ensure pool autostarts on boot
-      community.libvirt.virt_pool:
-        uri: "{{ libvirt_uri }}"
-        name: "{{ libvirt_pool }}"
-        command: autostart
-      register: autostart_pool
-      failed_when: autostart_pool is failed and
-                  ('already' not in (autostart_pool.msg | default('')))
+    - name: Ensure pool autostart is enabled (via virsh)
+      command: "virsh -c {{ libvirt_uri }} pool-autostart {{ libvirt_pool }}"
+      register: autostart_cmd
+      changed_when: autostart_cmd.rc == 0
+      failed_when: autostart_cmd.rc != 0 and
+                  ('already active' not in (autostart_cmd.stderr | default(''))) and
+                  ('is already marked as autostarted' not in (autostart_cmd.stderr | default('')))
 
     - name: Ensure cloud image present
       get_url:
