@@ -116,6 +116,10 @@
           NETWORK_CONFIG: "{{ lookup('file', playbook_dir + '/../cloudinit/' + item.name + '-network-config') }}"
       loop: "{{ vms }}"
 
+    - name: Normalize pool_path (strip brackets just in case)
+      set_fact:
+        pool_path: "{{ pool_path | regex_replace('^\\[', '') | regex_replace('\\]$', '') }}"
+
     - name: Check if domain exists
       command: "virsh -c {{ libvirt_uri }} dominfo {{ item.name }}"
       register: dominfo
