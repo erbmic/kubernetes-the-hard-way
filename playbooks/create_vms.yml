@@ -196,13 +196,11 @@
                   ('already' not in (autostart_res.stderr | default('')))
       loop: "{{ vms }}"
 
-    # 4) Sicherstellen, dass die Domain läuft (idempotent)
-    - name: Ensure domain running
-      command: "virsh -c {{ libvirt_uri }} start {{ item.name }}"
-      register: start_res
-      changed_when: start_res.rc == 0
-      failed_when: start_res.rc != 0 and
-                  ('is already running' not in (start_res.stderr | default('')))
+    - name: Ensure domains are running (idempotent)
+      community.libvirt.virt:
+        uri: "{{ libvirt_uri }}"
+        name: "{{ item.name }}"
+        state: running
       loop: "{{ vms }}"
 
     - name: Wait for SSH on each VM
