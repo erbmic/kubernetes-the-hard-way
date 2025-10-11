@@ -3,6 +3,10 @@ libvirt_network: vagrant-libvirt
 bridge_name: virbr1            # aus virsh net-info
 image_url: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
 
+vars:
+  libvirt_uri: "qemu:///system"
+  pool_path: "/var/lib/libvirt/images"
+
 vms:
   - name: controlplane01
     ip: 192.168.121.11/24
