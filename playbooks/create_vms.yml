@@ -127,6 +127,43 @@
       failed_when: false
       loop: "{{ vms }}"
 
+    - name: List existing networks (system URI)
+      community.libvirt.virt_net:
+        command: list_nets
+        uri: "{{ libvirt_uri }}"
+      register: nets
+
+    - name: Define vagrant-libvirt network if missing (192.168.121.0/24 on virbr1)
+      community.libvirt.virt_net:
+        uri: "{{ libvirt_uri }}"
+        command: define
+        name: "{{ libvirt_network }}"
+        xml: |
+          <network>
+            <name>{{ libvirt_network }}</name>
+            <forward mode='nat'/>
+            <bridge name='virbr1' stp='on' delay='0'/>
+            <ip address='192.168.121.1' netmask='255.255.255.0'>
+              <dhcp>
+                <range start='192.168.121.2' end='192.168.121.254'/>
+              </dhcp>
+            </ip>
+          </network>
+      when: libvirt_network not in (nets.networks | default([]))
+
+    - name: Ensure network is active
+      community.libvirt.virt_net:
+        uri: "{{ libvirt_uri }}"
+        name: "{{ libvirt_network }}"
+        state: active
+
+    - name: Ensure network autostarts on boot
+      command: "virsh -c {{ libvirt_uri }} net-autostart {{ libvirt_network }}"
+      register: net_autostart
+      changed_when: net_autostart.rc == 0
+      failed_when: net_autostart.rc != 0 and
+                  ('already' not in (net_autostart.stderr | default('')))
+
     # 2) Domain anlegen, falls sie fehlt (Index aus vorherigem Task referenzieren)
     - name: Create domain via virt-install (import existing disk)
       command: >
