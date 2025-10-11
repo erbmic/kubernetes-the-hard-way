@@ -123,7 +123,7 @@
       failed_when: false
       loop: "{{ vms }}"
 
-    # Domain anlegen, falls sie fehlt
+    # 2) Domain anlegen, falls sie fehlt (Index aus vorherigem Task referenzieren)
     - name: Create domain via virt-install (import existing disk)
       command: >
         virt-install
@@ -141,9 +141,12 @@
       args:
         creates: "/etc/libvirt/qemu/{{ item.name }}.xml"
       loop: "{{ vms }}"
-      when: dominfo.results[loop.index0].rc != 0
+      loop_control:
+        index_var: vm_idx            # <<— WICHTIG: eigenen Indexnamen setzen
+      when: dominfo.results[vm_idx].rc != 0
+      changed_when: true
 
-    # Autostart aktivieren (idempotent)
+    # 3) Autostart setzen (tolerant)
     - name: Enable autostart
       command: "virsh -c {{ libvirt_uri }} autostart {{ item.name }}"
       register: autostart_res
@@ -152,7 +155,7 @@
                   ('already' not in (autostart_res.stderr | default('')))
       loop: "{{ vms }}"
 
-    # Sicherstellen, dass sie laufen
+    # 4) Sicherstellen, dass die Domain läuft (idempotent)
     - name: Ensure domain running
       command: "virsh -c {{ libvirt_uri }} start {{ item.name }}"
       register: start_res
