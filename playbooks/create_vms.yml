@@ -116,69 +116,39 @@
           NETWORK_CONFIG: "{{ lookup('file', playbook_dir + '/../cloudinit/' + item.name + '-network-config') }}"
       loop: "{{ vms }}"
 
-    - name: Define domains via XML (robust schema)
+    - name: Define domains via ultra-minimal XML
       community.libvirt.virt:
         uri: "{{ libvirt_uri }}"
         command: define
         xml: |
           <domain type='kvm'>
             <name>{{ item.name }}</name>
-
-            <!-- Libvirt mag KiB; currentMemory hilft der Schema-Validierung -->
-            <memory unit='KiB'>{{ (item.mem_mb|int) * 1024 }}</memory>
-            <currentMemory unit='KiB'>{{ (item.mem_mb|int) * 1024 }}</currentMemory>
-            <vcpu placement='static'>{{ item.vcpus }}</vcpu>
-
+            <memory unit='MiB'>{{ item.mem_mb }}</memory>
+            <vcpu>{{ item.vcpus }}</vcpu>
             <os>
               <type arch='x86_64'>hvm</type>
               <boot dev='hd'/>
               <boot dev='cdrom'/>
             </os>
-
-            <features>
-              <acpi/><apic/><pae/>
-            </features>
-
-            <cpu mode='host-passthrough'/>
-            <clock offset='utc'/>
-
             <devices>
-              <!-- Systemdisk -->
               <disk type='file' device='disk'>
                 <driver name='qemu' type='qcow2'/>
                 <source file='{{ pool_path }}/{{ item.name }}.qcow2'/>
                 <target dev='vda' bus='virtio'/>
               </disk>
-
-              <!-- Cloud-Init ISO: konservativ IDE statt SATA -->
               <disk type='file' device='cdrom'>
-                <driver name='qemu' type='raw'/>
                 <source file='{{ pool_path }}/{{ item.name }}-seed.iso'/>
-                <target dev='hdc' bus='ide'/>
+                <target dev='sdb' bus='sata'/>
                 <readonly/>
               </disk>
-
-              <!-- Netzwerk -->
               <interface type='network'>
                 <source network='{{ libvirt_network }}'/>
-                <model type='virtio'/>
               </interface>
-
-              <!-- reine Serial/PTY; keine Grafik -->
               <graphics type='none'/>
-              <console type='pty'>
-                <target type='serial' port='0'/>
-              </console>
-              <serial type='pty'>
-                <target port='0'/>
-              </serial>
             </devices>
-
-            <on_poweroff>destroy</on_poweroff>
-            <on_reboot>restart</on_reboot>
-            <on_crash>restart</on_crash>
           </domain>
       loop: "{{ vms }}"
+
 
 
     - name: Ensure domains are running
