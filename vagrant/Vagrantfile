@@ -93,6 +93,8 @@ Vagrant.configure("2") do |config|
     lv.management_network_name = "vagrant-libvirt"
     lv.cpu_mode = "host-passthrough"
     lv.graphics_type = "none" # headless
+    lv.wait_for_address = true
+    lv.wait_for_address_timeout = 120
   end
 
   # Provision Control Nodes
