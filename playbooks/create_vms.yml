@@ -35,18 +35,20 @@
           </pool>
       when: libvirt_pool not in (pools.pools | default([]))
 
-    - name: Ensure pool is started
+    - name: Ensure pool is active
       community.libvirt.virt_pool:
         uri: "{{ libvirt_uri }}"
         name: "{{ libvirt_pool }}"
-        state: started     # ← idempotent
+        state: active
 
     - name: Ensure pool autostarts on boot
       community.libvirt.virt_pool:
         uri: "{{ libvirt_uri }}"
         name: "{{ libvirt_pool }}"
-        autostart: true    # einige Versionen akzeptieren das Feld
-        state: started
+        command: autostart
+      register: autostart_pool
+      failed_when: autostart_pool is failed and
+                  ('already' not in (autostart_pool.msg | default('')))
 
     - name: Ensure cloud image present
       get_url:
