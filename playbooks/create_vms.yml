@@ -116,47 +116,49 @@
           NETWORK_CONFIG: "{{ lookup('file', playbook_dir + '/../cloudinit/' + item.name + '-network-config') }}"
       loop: "{{ vms }}"
 
-    - name: Define domains via ultra-minimal XML
-      community.libvirt.virt:
-        uri: "{{ libvirt_uri }}"
-        command: define
-        xml: |
-          <domain type='kvm'>
-            <name>{{ item.name }}</name>
-            <memory unit='MiB'>{{ item.mem_mb }}</memory>
-            <vcpu>{{ item.vcpus }}</vcpu>
-            <os>
-              <type arch='x86_64'>hvm</type>
-              <boot dev='hd'/>
-              <boot dev='cdrom'/>
-            </os>
-            <devices>
-              <disk type='file' device='disk'>
-                <driver name='qemu' type='qcow2'/>
-                <source file='{{ pool_path }}/{{ item.name }}.qcow2'/>
-                <target dev='vda' bus='virtio'/>
-              </disk>
-              <disk type='file' device='cdrom'>
-                <source file='{{ pool_path }}/{{ item.name }}-seed.iso'/>
-                <target dev='sdb' bus='sata'/>
-                <readonly/>
-              </disk>
-              <interface type='network'>
-                <source network='{{ libvirt_network }}'/>
-              </interface>
-              <graphics type='none'/>
-            </devices>
-          </domain>
+    - name: Check if domain exists
+      command: "virsh -c {{ libvirt_uri }} dominfo {{ item.name }}"
+      register: dominfo
+      changed_when: false
+      failed_when: false
       loop: "{{ vms }}"
 
+    # Domain anlegen, falls sie fehlt
+    - name: Create domain via virt-install (import existing disk)
+      command: >
+        virt-install
+          --connect {{ libvirt_uri }}
+          --name {{ item.name }}
+          --memory {{ item.mem_mb }}
+          --vcpus {{ item.vcpus }}
+          --import
+          --disk path={{ pool_path }}/{{ item.name }}.qcow2,format=qcow2,bus=virtio
+          --disk path={{ pool_path }}/{{ item.name }}-seed.iso,device=cdrom,bus=sata,readonly=on
+          --network network={{ libvirt_network }},model=virtio
+          --graphics none
+          --os-variant ubuntu22.04
+          --noautoconsole
+      args:
+        creates: "/etc/libvirt/qemu/{{ item.name }}.xml"
+      loop: "{{ vms }}"
+      when: dominfo.results[loop.index0].rc != 0
 
+    # Autostart aktivieren (idempotent)
+    - name: Enable autostart
+      command: "virsh -c {{ libvirt_uri }} autostart {{ item.name }}"
+      register: autostart_res
+      changed_when: autostart_res.rc == 0
+      failed_when: autostart_res.rc != 0 and
+                  ('already' not in (autostart_res.stderr | default('')))
+      loop: "{{ vms }}"
 
-    - name: Ensure domains are running
-      community.libvirt.virt:
-        uri: "{{ libvirt_uri }}"
-        name: "{{ item.name }}"
-        state: running
-        autostart: true
+    # Sicherstellen, dass sie laufen
+    - name: Ensure domain running
+      command: "virsh -c {{ libvirt_uri }} start {{ item.name }}"
+      register: start_res
+      changed_when: start_res.rc == 0
+      failed_when: start_res.rc != 0 and
+                  ('is already running' not in (start_res.stderr | default('')))
       loop: "{{ vms }}"
 
     - name: Wait for SSH on each VM
